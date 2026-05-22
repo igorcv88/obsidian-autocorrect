@@ -32,7 +32,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
 	automatic_correction: true,
 	correct_on_enter: true,
 	correction_delay_ms: 1200,
-	model: "openai/gpt-oss-120b",
+	model: "llama-3.1-8b-instant",
 };
 
 export default class AutoCorrecter extends Plugin {
@@ -104,6 +104,20 @@ export default class AutoCorrecter extends Plugin {
 		this.scheduleCorrection(editor, cursor.line, this.settings.correction_delay_ms);
 	}
 
+	isInsideFencedCodeBlock(editor: Editor, line: number): boolean {
+	let inside = false;
+
+	for (let i = 0; i < line; i++) {
+		const current = editor.getLine(i).trim();
+
+		if (current.startsWith("```") || current.startsWith("~~~")) {
+			inside = !inside;
+		}
+	}
+
+	return inside;
+}
+
 	scheduleCorrection(editor: Editor, line: number, delayMs: number) {
 		const key = this.correctionKey(editor, line);
 		const existing = this.pendingCorrections.get(key);
@@ -126,6 +140,10 @@ export default class AutoCorrecter extends Plugin {
 
 	async correctLine(editor: Editor, line: number) {
 		if (line < 0 || line >= editor.lineCount()) {
+			return;
+		}
+
+		if (this.isInsideFencedCodeBlock(editor, line)) {
 			return;
 		}
 
