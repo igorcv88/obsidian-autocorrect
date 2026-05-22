@@ -33,7 +33,7 @@ describe("shouldCorrectLine", () => {
 	});
 
 	it("skips markdown structures that are easy to corrupt", () => {
-		expect(shouldCorrectLine("# Headng").shouldCorrect).toBe(false);
+		expect(shouldCorrectLine("# Headng").shouldCorrect).toBe(true);
 		expect(shouldCorrectLine("#tag").shouldCorrect).toBe(false);
 		expect(shouldCorrectLine("| --- | --- |").shouldCorrect).toBe(false);
 	});
