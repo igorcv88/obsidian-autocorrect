@@ -105,18 +105,18 @@ export default class AutoCorrecter extends Plugin {
 	}
 
 	isInsideFencedCodeBlock(editor: Editor, line: number): boolean {
-	let inside = false;
-
-	for (let i = 0; i < line; i++) {
-		const current = editor.getLine(i).trim();
-
-		if (current.startsWith("```") || current.startsWith("~~~")) {
-			inside = !inside;
+		let inside = false;
+	
+		for (let i = 0; i < line; i++) {
+			const current = editor.getLine(i).trim();
+	
+			if (current.startsWith("```") || current.startsWith("~~~")) {
+				inside = !inside;
+			}
 		}
+	
+		return inside;
 	}
-
-	return inside;
-}
 
 	scheduleCorrection(editor: Editor, line: number, delayMs: number) {
 		const key = this.correctionKey(editor, line);
