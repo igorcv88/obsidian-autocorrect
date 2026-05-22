@@ -20,13 +20,52 @@ const MAX_LENGTH_MULTIPLIER = 2.5;
 const MAX_LENGTH_SLACK = 24;
 
 export function splitEditableLine(line: string): EditableLine {
-	const match = line.match(
-		/^(\s*(?:(?:[-*+]\s+(?:\[[ xX]\]\s+)?)|(?:\d+[.)]\s+)|(?:>\s+))*)(.*)$/
-	);
+	const leadingWhitespace = line.match(/^[\t ]*/)?.[0] ?? "";
+	const withoutIndent = line.slice(leadingWhitespace.length);
+
+	const checkboxMatch = withoutIndent.match(/^([-*+]\s+\[[ xX]\]\s+)(.*)$/);
+	if (checkboxMatch) {
+		return {
+			prefix: leadingWhitespace + checkboxMatch[1],
+			body: checkboxMatch[2],
+		};
+	}
+
+	const bulletMatch = withoutIndent.match(/^([-*+]\s+)(.*)$/);
+	if (bulletMatch) {
+		return {
+			prefix: leadingWhitespace + bulletMatch[1],
+			body: bulletMatch[2],
+		};
+	}
+
+	const orderedMatch = withoutIndent.match(/^(\d+[.)]\s+)(.*)$/);
+	if (orderedMatch) {
+		return {
+			prefix: leadingWhitespace + orderedMatch[1],
+			body: orderedMatch[2],
+		};
+	}
+
+	const headingMatch = withoutIndent.match(/^(#{1,6}\s+)(.*)$/);
+	if (headingMatch) {
+		return {
+			prefix: leadingWhitespace + headingMatch[1],
+			body: headingMatch[2],
+		};
+	}
+
+	const quoteMatch = withoutIndent.match(/^(>\s+)(.*)$/);
+	if (quoteMatch) {
+		return {
+			prefix: leadingWhitespace + quoteMatch[1],
+			body: quoteMatch[2],
+		};
+	}
 
 	return {
-		prefix: match ? match[1] : "",
-		body: match ? match[2] : line,
+		prefix: leadingWhitespace,
+		body: withoutIndent,
 	};
 }
 
@@ -46,11 +85,11 @@ export function shouldCorrectLine(line: string): CorrectionDecision {
 		return { shouldCorrect: false, reason: "not-enough-letters", editable };
 	}
 
-	if (!/[A-Za-z]/.test(body)) {
-		return { shouldCorrect: false, reason: "no-ascii-letters", editable };
+	if (!/\p{L}/u.test(body)) {
+		return { shouldCorrect: false, reason: "no-letters", editable };
 	}
 
-	if (/^[\W\d_]+$/.test(body)) {
+	if (/^[\W\d_]+$/u.test(body)) {
 		return { shouldCorrect: false, reason: "punctuation-or-numbers", editable };
 	}
 
@@ -106,6 +145,22 @@ export function validateCorrection(
 		return { accepted: false, reason: "empty-correction" };
 	}
 
+	if (/there is no text provided/i.test(corrected)) {
+	return { accepted: false, reason: "model-refusal-no-text" };
+	}
+	
+	if (/please provide the text/i.test(corrected)) {
+		return { accepted: false, reason: "model-refusal-request-text" };
+	}
+	
+	if (/^```/.test(corrected.trim())) {
+		return { accepted: false, reason: "returned-code-block" };
+	}
+	
+	if (/^\{[\s\S]*"corrected"[\s\S]*\}$/.test(corrected.trim())) {
+		return { accepted: false, reason: "returned-json-as-text" };
+	}
+
 	if (corrected === original) {
 		return { accepted: false, reason: "unchanged" };
 	}
@@ -157,18 +212,29 @@ function parseJsonObject(content: string): string | null {
 }
 
 function countLetters(text: string): number {
-	const matches = text.match(/[A-Za-z]/g);
+	const matches = text.match(/\p{L}/gu);
 	return matches ? matches.length : 0;
 }
 
 function isProtectedMarkdownLine(line: string): boolean {
 	const trimmed = line.trim();
+
 	return (
-		/^#{1,6}\s/.test(trimmed) ||
+		// Fenced code block delimiter
 		/^```/.test(trimmed) ||
-		/^---$/.test(trimmed) ||
-		/^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(trimmed) ||
-		/^#\S+$/.test(trimmed)
+		/^~~~/.test(trimmed) ||
+
+		// Horizontal rule
+		/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed) ||
+
+		// Empty heading: #, ##, ###
+		/^#{1,6}\s*$/.test(trimmed) ||
+
+		// Hashtag/tag, not heading: #tag
+		/^#\S+$/.test(trimmed) ||
+
+		// Table separator row: |---|---|
+		/^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(trimmed)
 	);
 }
 
