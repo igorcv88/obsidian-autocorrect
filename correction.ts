@@ -89,10 +89,6 @@ export function shouldCorrectLine(line: string): CorrectionDecision {
 		return { shouldCorrect: false, reason: "no-letters", editable };
 	}
 
-	if (/^[\W\d_]+$/u.test(body)) {
-		return { shouldCorrect: false, reason: "punctuation-or-numbers", editable };
-	}
-
 	if (isLikelyUrlOrEmail(body)) {
 		return { shouldCorrect: false, reason: "url-or-email", editable };
 	}
